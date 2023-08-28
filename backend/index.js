@@ -1,33 +1,30 @@
 require("./mongo.js");
-require('dotenv').config()
-
+require("dotenv").config();
 
 const express = require("express");
+const cors = require("cors");
 const app = express();
 
 const Note = require("./models/Note.js");
 const User = require("./models/User.js");
 
-const userExtractor = require("./middlewares/userExtractor.js")
+const userExtractor = require("./middlewares/userExtractor.js");
 const usersRouter = require("./controllers/users.js");
 const loginRouter = require("./controllers/login.js");
 
+app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
   res.send("<h1>Hello World</h1>");
 });
 
-app.get("/api/notes", (req, res) => {
-  Note.find({})
-    .populate("users", {
-      username: 1,
-      name: 1,
-    })
-    .then((notes) => {
-      res.json(notes);
-    })
-    .catch(() => res.status(500));
+app.get("/api/notes", async (request, response) => {
+  const notes = await Note.find({}).populate("user", {
+    username: 1,
+    name: 1,
+  });
+  response.json(notes);
 });
 
 app.get("/api/notes/:id", (req, res, next) => {
@@ -57,7 +54,7 @@ app.put("/api/notes/:id", userExtractor, (req, res, next) => {
   });
 });
 
-app.delete("/api/notes/:id",userExtractor, (req, res, next) => {
+app.delete("/api/notes/:id", userExtractor, (req, res, next) => {
   const { id } = req.params;
   Note.findByIdAndRemove(id)
     .then((result) => {
@@ -66,7 +63,7 @@ app.delete("/api/notes/:id",userExtractor, (req, res, next) => {
     .catch((error) => next(error));
 });
 
-app.post("/api/notes",userExtractor, async (req, res, next) => {
+app.post("/api/notes", userExtractor, async (req, res, next) => {
   const { content, important = false } = req.body;
 
   //Saca userId de req a traves de middleware
@@ -97,24 +94,22 @@ app.post("/api/notes",userExtractor, async (req, res, next) => {
 });
 
 app.use("/api/users", usersRouter);
-app.use("/api/login", loginRouter)
+app.use("/api/login", loginRouter);
 
 app.use((error, req, res, next) => {
   console.error(error);
 
   if (error.name === "CastError") {
     res.status(400).send({ error: "id used is malformed" });
-  } else if(error.name === "JsonWebTokenError"){
+  } else if (error.name === "JsonWebTokenError") {
     res.status(401).json({
-      error: "invalid token"
-    })
-  }
-  else if (error.name === "TokenExpirerError"){
+      error: "invalid token",
+    });
+  } else if (error.name === "TokenExpirerError") {
     res.status(401).json({
-      error: "token expired"
-    })
-  }
-   else {
+      error: "token expired",
+    });
+  } else {
     res.status(500).end();
   }
 });
