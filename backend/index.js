@@ -19,12 +19,17 @@ app.get("/", (req, res) => {
   res.send("<h1>Hello World</h1>");
 });
 
-app.get("/api/notes", async (request, response) => {
-  const notes = await Note.find({}).populate("user", {
-    username: 1,
-    name: 1,
-  });
-  response.json(notes);
+app.get("/api/notes", userExtractor, async (req, res, next) => {
+  const userId = req.userId;
+
+  try {
+    // Consulta la base de datos para obtener solo las notas del usuario autenticado
+    const notes = await Note.find({ user: userId });
+    console.log("notes from server", notes);
+    res.json(notes);
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/notes/:id", (req, res, next) => {
@@ -57,8 +62,13 @@ app.put("/api/notes/:id", userExtractor, (req, res, next) => {
 app.delete("/api/notes/:id", userExtractor, (req, res, next) => {
   const { id } = req.params;
   Note.findByIdAndRemove(id)
-    .then((result) => {
-      res.status(204).end();
+    .then((deletedNote) => {
+      // Cambio del nombre de la variable aquí
+      if (deletedNote) {
+        res.status(204).end(); // 204 significa "No Content" - éxito, pero sin contenido
+      } else {
+        res.status(404).end(); // 404 significa "Not Found" - la nota no se encontró
+      }
     })
     .catch((error) => next(error));
 });
